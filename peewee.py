@@ -361,17 +361,19 @@ class Database(object):
         framing = 'CREATE %(unique)s INDEX %(model)s_%(index_suffix)s ON %(model)s(%(fields)s);'
 
         for field in fields:
-            if field not in model_class._meta.fields:
+            if field not in model_class._meta.fields and field not in model_class._meta.rel_fields:
                 raise AttributeError('Field %s not on model %s' % (field, model_class)
                 )
 
         unique_expr = ternary(unique, 'UNIQUE', '')
 
+        real_column_names = [ternary(field in model_class._meta.rel_fields, model_class._meta.rel_fields.get(field), field) for field in fields]
+
         query = framing % {
             'unique': unique_expr,
             'model': model_class._meta.db_table,
-            'index_suffix': '__'.join(fields),
-            'fields': ', '.join(fields)
+            'index_suffix': '__'.join(real_column_names),
+            'fields': ', '.join(real_column_names)
         }
 
         self.execute(query)
@@ -1967,7 +1969,7 @@ class Model(object):
             return
 
         cls._meta.database.create_table(cls)
-        
+
         for field_name, field_obj in cls._meta.fields.items():
             if isinstance(field_obj, PrimaryKeyField):
                 cls._meta.database.create_index(cls, field_obj.name, True)
