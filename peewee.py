@@ -354,7 +354,26 @@ class Database(object):
             'model': model_class._meta.db_table,
             'field': field_name
         }
-        
+
+        self.execute(query)
+
+    def create_multifield_index(self, model_class, fields, unique=False):
+        framing = 'CREATE %(unique)s INDEX %(model)s_%(index_suffix)s ON %(model)s(%(fields)s);'
+
+        for field in fields:
+            if field not in model_class._meta.fields:
+                raise AttributeError('Field %s not on model %s' % (field, model_class)
+                )
+
+        unique_expr = ternary(unique, 'UNIQUE', '')
+
+        query = framing % {
+            'unique': unique_expr,
+            'model': model_class._meta.db_table,
+            'index_suffix': '__'.join(fields),
+            'fields': ', '.join(fields)
+        }
+
         self.execute(query)
 
     def create_foreign_key(self, model_class, field):
@@ -1788,6 +1807,8 @@ database = SqliteDatabase(DATABASE_NAME)
 class BaseModelOptions(object):
     ordering = None
     pk_sequence = None
+    unique_together = None
+    index_together = None
 
     def __init__(self, model_class, options=None):
         # configurable options
@@ -1836,7 +1857,7 @@ class BaseModelOptions(object):
 
 
 class BaseModel(type):
-    inheritable_options = ['database', 'ordering', 'pk_sequence']
+    inheritable_options = ['database', 'index_together', 'ordering', 'pk_sequence', 'unique_together']
     
     def __new__(cls, name, bases, attrs):
         cls = super(BaseModel, cls).__new__(cls, name, bases, attrs)
@@ -1954,7 +1975,23 @@ class Model(object):
                 cls._meta.database.create_foreign_key(cls, field_obj)
             elif field_obj.db_index or field_obj.unique:
                 cls._meta.database.create_index(cls, field_obj.name, field_obj.unique)
-    
+
+        # ensure that unique_together and index_together are correct
+        if cls._meta.unique_together and not isinstance(cls._meta.unique_together[0],(list, tuple)):
+            cls._meta.unique_together = (cls._meta.unique_together,)
+
+        if cls._meta.index_together and not isinstance(cls._meta.index_together[0],(list, tuple)):
+            cls._meta.index_together = (cls._meta.index_together,)
+
+        #create the indexes
+        if cls._meta.unique_together:
+            for index_set in cls._meta.unique_together:
+                cls._meta.database.create_multifield_index(cls, index_set, True)
+
+        if cls._meta.index_together:
+            for index_set in cls._meta.index_together:
+                cls._meta.database.create_multifield_index(cls, index_set, False)
+
     @classmethod
     def drop_table(cls, fail_silently=False):
         cls._meta.database.drop_table(cls, fail_silently)

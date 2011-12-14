@@ -111,6 +111,13 @@ class DefaultVals(TestModel):
 class UniqueModel(TestModel):
     name = peewee.CharField(unique=True)
 
+class UniqueTogetherModel(TestModel):
+    first_name = peewee.CharField()
+    last_name = peewee.CharField()
+
+    class Meta:
+        unique_together = ('first_name', 'last_name')
+
 class OrderedModel(TestModel):
     title = peewee.CharField()
     created = peewee.DateTimeField(default=datetime.datetime.now)
@@ -2121,7 +2128,9 @@ class ModelIndexTestCase(BasePeeweeTestCase):
         super(ModelIndexTestCase, self).setUp()
         UniqueModel.drop_table(True)
         UniqueModel.create_table()
-    
+        UniqueTogetherModel.drop_table(True)
+        UniqueTogetherModel.create_table()
+
     def get_sorted_indexes(self, model):
         return test_db.get_indexes_for_table(model._meta.db_table)
     
@@ -2185,6 +2194,10 @@ class ModelIndexTestCase(BasePeeweeTestCase):
         self.assertRaises(Exception, UniqueModel.create, name='a')
         test_db.rollback()
 
+    def test_unique_together_index(self):
+        uniq1 = UniqueTogetherModel.create(first_name='john', last_name='doe')
+        uniq2 = UniqueTogetherModel.create(first_name='sarah', last_name='smith')
+        self.assertRaises(Exception, UniqueTogetherModel.create, first_name='john', last_name='doe')
 
 class ModelTablesTestCase(BasePeeweeTestCase):
     tables_might_not_be_there = ['defaultvals', 'nullmodel', 'uniquemodel']
