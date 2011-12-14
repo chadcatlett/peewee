@@ -2200,7 +2200,7 @@ class ModelIndexTestCase(BasePeeweeTestCase):
         self.assertRaises(Exception, UniqueTogetherModel.create, first_name='john', last_name='doe')
 
 class ModelTablesTestCase(BasePeeweeTestCase):
-    tables_might_not_be_there = ['defaultvals', 'nullmodel', 'uniquemodel']
+    tables_might_not_be_there = ['defaultvals', 'nullmodel', 'uniquemodel', 'uniquetogethermodel']
     
     def test_tables_created(self):
         tables = test_db.get_tables()
